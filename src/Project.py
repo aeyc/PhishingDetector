@@ -8,15 +8,6 @@ Created on Tue Aug 27 14:31:04 2019
 Data Seperation
 """
 import pandas as pd
-#import csv
-
-#with open('query_result.csv') as fd:
-#    cr = csv.reader(fd, escapechar='/')
-#    for idx,i in enumerate(cr):
-#        if idx==20:
-#            break
-#        print(i)
-
 
 df = pd.read_csv("query_result.csv",escapechar = '\\')
 formIDs = df.form_id
@@ -31,13 +22,18 @@ Tokenize
 Reference: StackOverFlow
 """
 import nltk
+import re
 
 infos = infos.str.replace('[^A-z ]','').str.replace(' +',' ').str.strip()
 infos = infos.str.replace('^',' ').str.replace(' +',' ').str.strip()
+infos = infos.str.replace('[',' ').str.replace(' +',' ').str.strip()
+infos = infos.str.replace('[^\w\s]',' ').str.replace(' +',' ').str.strip()
 
+infos = infos.str.replace(']',' ').str.replace(' +',' ').str.strip()
+infos = infos.str.lower()
+for i in infos:
+    i= re.sub('[\W_]+', '', str(i))
 df['cleaned'] = [ nltk.word_tokenize( str(sentence) ) for sentence in infos ]
-
-
 #%% 
 """
 Data analysis
@@ -50,40 +46,99 @@ spam_forms = df[df.target == 'SPAM']
 safe_forms = df[df.target != 'SPAM']
 
 #------> undo comment here <------#
-
+#spam_forms['cleaned'] = spam_forms['cleaned'].str.replace('[^\w\s]','').str.replace(' +',' ').str.strip()
 table = pd.Series(spam_forms['cleaned']).apply(pd.value_counts).fillna(0).astype(int)
 #table.plot()
 #plt.show()
 
 #%%
-"""
-Most used Words in Spam Forms
-
-Reference: GeeksForGeeks
-"""
-from collections import Counter
-
-spam_str = str(spam_forms['cleaned'])
-split_it = spam_str.split() 
-Counter = Counter(split_it) 
-  
-most_occur_spam = Counter.most_common(10) #k = 10
-#print(most_occur_spam)
+#replace method str
+def punc_rep(s):
+    s = s.replace('[^\w\s]',' ').strip()
+    s = s.replace('        ','').strip()
+    s = s.replace(',','').strip()
+    s = s.replace('.','').strip()
+    s = s.replace('[','').strip()
+    s = s.replace(']','').strip()
+    s = s.replace(':','').strip()
+    s = s.replace('        ','').strip()
+    s = s.lower()
+    return s
 #%%
 """
-Most used Words in Safe Forms
-
-Reference: GeeksForGeeks
+Removing digits, and other characters
+Creating a dictionary for cleaned words and their occurancies
+Spam Froms
 """
-from collections import Counter
+from nltk.corpus import stopwords
+stopWords = set(stopwords.words('english'))
+
+from string import digits
+spam_str = str(spam_forms['cleaned'])
+spam_str = punc_rep(spam_str)
+remove_digits = str.maketrans('','',digits)
+spam_str = spam_str.translate(remove_digits)
+
+split_spam = spam_str.split() 
+spam_dct = dict()
+tmp = []
+for i in split_spam:
+    if i not in stopWords:
+        tmp.append(i)
+split_spam = tmp
+for i in split_spam:
+    if i in spam_dct:
+        spam_dct[i] += 1
+    else:
+        spam_dct[i] = 1
+#%%
+"""
+Removing digits, and other characters
+Creating a dictionary for cleaned words and their occurancies
+Safe Froms
+"""
+
 safe_str = str(safe_forms['cleaned'])
+safe_str = punc_rep(safe_str)
+remove_digits = str.maketrans('','',digits)
+safe_str = safe_str.translate(remove_digits)
 
 split_safe = safe_str.split() 
-Counter5 = Counter(split_safe) 
-  
-most_occur_safe = Counter5.most_common(15) #k = 10
-#split_it_safe = safe_str.split() 
-#Counter1 = Counter(safe_str.split()) 
-  
-#most_occur_safe = (Counter(safe_str.split())).most_common(10) #k = 10
-#print(most_occur_safe)
+safe_dct = dict()
+former = split_safe
+tmp = []
+for i in split_safe:
+    if i not in stopWords:
+        tmp.append(i)
+split_safe = tmp
+for i in split_safe:
+    if i in safe_dct:
+        safe_dct[i] += 1
+    else:
+        safe_dct[i] = 1
+#%%
+#Z score
+"""
+Dictionary to Dataframe
+
+"""
+from scipy import stats
+safe_df = pd.DataFrame.from_dict(safe_dct, orient='index')
+safe_df.columns=['count']
+safe_df['zscore'] = stats.zscore(safe_df['count'])
+
+spam_df = pd.DataFrame.from_dict(spam_dct, orient='index')
+spam_df.columns=['count']
+spam_df['zscore'] = stats.zscore(spam_df['count'])
+
+#%%
+"""
+Normalization of data with ZScore
+spam_df>3: email,submit,form,name,password,student - <-3 empty df
+safe_df>3: submit,name,email - <-3 empty df
+"""
+spam_df.drop(spam_df[ spam_df['zscore'] >3 ].index , inplace=True)
+safe_df.drop(safe_df[ safe_df['zscore'] >3 ].index , inplace=True)
+#%%
+
+
