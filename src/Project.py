@@ -160,38 +160,15 @@ Plots
 #plt.show()
 #%%
 """
-Algortihm trial for tdif
-n: total no of words in spam forms
-"""
-#def tf_idf(i,j):
-#   return tf(i,j)*idf(i,j)
-#
-#def tf(i,j):
-#    return i/j
-#
-#def idf(i,j):
-#    return np.log(j/i)
-#
-#n = sum(spam_df['count'])
-#m = sum(safe_df['count'])
-#
-#spam_df['tf_idf'] = tf_idf(spam_df['count'],n)
-#safe_df['tf_idf'] = tf_idf(safe_df['count'],n)
-
-#%%
-"""
 Vectorizing with Tfidf Vectorizer
 
 """
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn import datasets
 from sklearn import svm
-from sklearn.linear_model import LogisticRegression
+#from sklearn.linear_model import LogisticRegression
 
-new_df = spam_df.append(safe_df)
 X_train, X_test, y_train, y_test = train_test_split(df['sentence'], df['target'], test_size = 0.1, random_state = 1)
-#X_train, X_test, y_train, y_test = train_test_split(new_df['word'].sample(n = 146),spam_df['word'], test_size = 0.1, random_state = 1)
 
 vectorizer = TfidfVectorizer()
 
@@ -202,12 +179,34 @@ svm.fit(X_train, y_train)
 
 #%%
 from sklearn.metrics import confusion_matrix
+labels = ['SPAM', 'SAFE']
 X_test = vectorizer.transform(X_test)
 y_pred = svm.predict(X_test)
 print(confusion_matrix(y_test, y_pred))
+ex = confusion_matrix(y_test, y_pred)
 
 def pred(msg):
     msg = vectorizer.transform([msg])
     prediction = svm.predict(msg)
     #svm.predict(vectorizer.transform(['password']))
     return prediction[0]
+
+#%%https://medium.com/@randerson112358/email-spam-detection-using-python-machine-learning-abe38c889855
+#%% 
+"""
+creating own machine learning algorithm
+1- if unique(only in one of the safe or spam categories) word get z score
+-IF NOT IN SIMILARITY DF
+2if in similarity df add as in similarity df zscore
+
+"""
+similarity_df = pd.merge(safe_df, spam_df, on=['word'], how='inner')
+similarity_df['zscore'] = abs(similarity_df['zscore_x']) - abs(similarity_df['zscore_y'])
+similarity_df.loc[similarity_df.zscore < 0, 'label'] = 'SPAM' 
+similarity_df.loc[similarity_df.zscore > 0, 'label'] = 'SAFE'
+similarity_df.loc[similarity_df.zscore > 0, 'label'] = 'SAFE'  
+#similarity_df = similarity_df.drop(columns=['count_x','zscore_x','label_x','count_y','zscore_y','label_y'])
+train_df = pd.DataFrame(columns=['word','zscore','label'])
+train_df['word']
+        
+
